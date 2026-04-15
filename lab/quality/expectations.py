@@ -136,5 +136,27 @@ def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[Expectati
         )
     )
 
+    # [NEW EXPECTATION 1] Không chứa system error
+    bad_sys_err = [r for r in cleaned_rows if any(err in (r.get("chunk_text") or "").lower() for err in ["error", "traceback", "fatal", "exception"])]
+    results.append(
+        ExpectationResult(
+            "no_system_error_messages",
+            len(bad_sys_err) == 0,
+            "halt",
+            f"errors={len(bad_sys_err)}",
+        )
+    )
+
+    # [NEW EXPECTATION 2] Không chứa bản nháp
+    bad_draft = [r for r in cleaned_rows if "[draft]" in (r.get("chunk_text") or "").lower() or "bản nháp" in (r.get("chunk_text") or "").lower()]
+    results.append(
+        ExpectationResult(
+            "no_draft_policies",
+            len(bad_draft) == 0,
+            "halt",
+            f"drafts={len(bad_draft)}",
+        )
+    )
+
     halt = any(not r.passed and r.severity == "halt" for r in results)
     return results, halt

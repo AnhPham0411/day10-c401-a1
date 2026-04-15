@@ -151,8 +151,20 @@ def clean_rows(
 
         # normalize/clean text
         cleaned_text = _clean_chunk_text(text)
-        if cleaned_text and ("error" in cleaned_text.lower() or "traceback" in cleaned_text.lower()):
-            quarantine.append({**raw, "reason": "contains_error_marker"})
+        
+        # [NEW RULE 1] Loại bỏ các dòng chứa thông báo lỗi hệ thống
+        if cleaned_text and any(err in cleaned_text.lower() for err in ["error", "traceback", "fatal", "exception"]):
+            quarantine.append({**raw, "reason": "contains_system_error"})
+            continue
+
+        # [NEW RULE 2] Loại bỏ các chunk văn bản quá ngắn (dưới 15 ký tự) vì không đủ ngữ cảnh phục vụ LLM
+        if cleaned_text and len(cleaned_text) < 15:
+            quarantine.append({**raw, "reason": "chunk_text_too_short_for_llm"})
+            continue
+
+        # [NEW RULE 3] Cấm các policy đang ở trạng thái 'draft' (bản nháp) lọt vào system
+        if "[draft]" in cleaned_text.lower() or "bản nháp" in cleaned_text.lower():
+            quarantine.append({**raw, "reason": "draft_policy_not_allowed"})
             continue
 
         # allowlist check after mapping
