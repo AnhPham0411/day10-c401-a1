@@ -6,7 +6,7 @@
 |-----|------------------|-------|
 | Phạm Tuấn Anh | Ingestion / Raw Owner/Monitoring / Docs Owner | Bintuananh2003@gmail.com |
 | Vũ Lê Hoàng | Cleaning & Quality Owner | hoanglevu1705@gmail.com |
-| ___ | Embed & Idempotency Owner | ___ |
+| Vũ Hồng Quang | Embed & Idempotency Owner | quangzetsu@gmail.com |
 
 **Ngày nộp:** 15/04/2026
 **Repo:** https://github.com/AnhPham0411/day10-c401-a1
