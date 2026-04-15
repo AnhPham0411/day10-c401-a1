@@ -49,22 +49,27 @@ _________________
 
 | Rule / Expectation mới (tên ngắn) | Trước (số liệu) | Sau / khi inject (số liệu) | Chứng cứ (log / CSV / commit) |
 |-----------------------------------|------------------|-----------------------------|-------------------------------|
-| Data Ingestion & Freshness | 10 raw records | FAIL (Age: 118h) | manifest_2026-04-15T05-42Z.json |
-| [Rule] Lọc System Error | 0 quarantine do lỗi | 1 bị loại (contains_system_error) | quarantine_2026-04-15T09-29Z.csv |
-| [Rule] Lọc text quá ngắn | 0 quarantine do ngắn | 1 bị loại (chunk_text_too_short_for_llm) | quarantine_2026-04-15T09-29Z.csv |
-| [Rule] Lọc bản draft | 0 quarantine do draft | 1 bị loại (draft_policy_not_allowed) | quarantine_2026-04-15T09-29Z.csv |
-| [Expectation] Không chứa system error | N/A | OK (halt) :: errors=0 | log chạy etl_pipeline |
-| [Expectation] Không chứa bản nháp | N/A | OK (halt) :: drafts=0 | log chạy etl_pipeline |
+| Data Ingestion & Freshness | 10 raw records | FAIL (Age: 118h) | `manifest_2026-04-15T05-42Z.json` |
+| [Rule] Lọc System Error | 0 quarantine do lỗi | 1 bị loại (`contains_system_error`) | `quarantine_2026-04-15T09-29Z.csv` (row 11) |
+| [Rule] Lọc text quá ngắn | 0 quarantine do ngắn | 1 bị loại (`chunk_text_too_short_for_llm`) | `quarantine_2026-04-15T09-29Z.csv` (row 12) |
+| [Rule] Lọc bản draft | 0 quarantine do draft | 1 bị loại (`draft_policy_not_allowed`) | `quarantine_2026-04-15T09-29Z.csv` (row 13) |
+| [Expectation] Không chứa system error | N/A | OK (**halt**) :: errors=0 | `run_inject-bad.log` dòng 130 |
+| [Expectation] Không chứa bản nháp | N/A | OK (**halt**) :: drafts=0 | `run_inject-bad.log` dòng 131 |
 
-**Rule chính (baseline + mở rộng):**
+**3 Rule mới (cleaning_rules.py — dòng 155–168):**
 
-- Lọc cảnh báo hệ thống (`contains_system_error`) - Giúp ngăn chặn rác từ trích xuất db.
-- Lọc đoạn văn ngắn dưới 15 ký tự (`chunk_text_too_short_for_llm`) - Không đủ bối cảnh cho Agent/LLM.
-- Lọc văn bản có đánh dấu bản nháp (`draft_policy_not_allowed`) - Đảm bảo chỉ policy đã phê duyệt mới được nạp.
+- `contains_system_error` — Lọc chunk chứa từ khóa lỗi hệ thống (`error`, `traceback`, `fatal`, `exception`). Ngăn rác từ trích xuất DB lọt vào vector store.
+- `chunk_text_too_short_for_llm` — Lọc chunk dưới 15 ký tự (ví dụ: "Too short"). Văn bản quá ngắn không đủ ngữ cảnh cho Agent/LLM.
+- `draft_policy_not_allowed` — Lọc policy có nhãn `[DRAFT]` hoặc "bản nháp". Đảm bảo chỉ chính sách đã phê duyệt mới được nạp.
+
+**2 Expectation mới (expectations.py — dòng 139–159):**
+
+- `no_system_error_messages` (**halt**) — Đảm bảo cleaned output không còn thông báo lỗi hệ thống. Nếu FAIL → dừng pipeline.
+- `no_draft_policies` (**halt**) — Đảm bảo cleaned output không còn bản nháp. Nếu FAIL → dừng pipeline.
 
 **Ví dụ 1 lần expectation fail (nếu có) và cách xử lý:**
 
-Thử nghiệm xóa rule lọc draft khỏi \`cleaning_rules.py\` dẫn đến expectation báo \`FAIL (drafts=1)\` và dừng (HALT) toàn bộ pipeline. Lỗi này đảm bảo rác không thể được đưa vào ChromaDB.
+Thử nghiệm xóa rule lọc draft khỏi `cleaning_rules.py` dẫn đến expectation `no_draft_policies` báo `FAIL (drafts=1)` và dừng (**HALT**) toàn bộ pipeline. Lỗi này đảm bảo rác không thể được đưa vào ChromaDB.
 
 ---
 
@@ -72,12 +77,18 @@ Thử nghiệm xóa rule lọc draft khỏi \`cleaning_rules.py\` dẫn đến e
 
 > Bắt buộc: inject corruption (Sprint 3) — mô tả + dẫn `artifacts/eval/…` hoặc log.
 
-**Kịch bản inject:**
+**Kịch bản inject (run_id=`inject-bad`):**
 Chúng tôi đã cố tình chạy pipeline với cờ `--no-refund-fix --skip-validate` (bỏ qua bước fix "14 ngày" thành "7 ngày" trong policy refund và ép ghi đè các lỗi Expectation vào Vector DB). Việc này nhằm mô phỏng lại lỗi khi một kỹ sư vô tình bỏ qua khâu Validation.
 
 **Kết quả định lượng (từ CSV / bảng):**
-Theo kết quả đánh giá (trong file `artifacts/eval/eval_dirty.csv`), việc inject này đã làm hỏng Retrieval:
-- Với câu hỏi `q_refund_window`: Trường `hits_forbidden` bị đổi thành `yes` (trước đó ở chế độ chuẩn (`eval_clean.csv`) là `no`). Lí do: text cũ chứa khoảng thời gian sai là "14 ngày làm việc" đã bị ChromaDB lấy ra.
+
+| Câu hỏi eval | Trước (inject-bad / eval_dirty) | Sau (fix-good / eval_clean) | File chứng cứ |
+|---|---|---|---|
+| `q_refund_window` | `hits_forbidden=yes` ❌ | `hits_forbidden=no` ✅ | `eval_dirty.csv` vs `eval_clean.csv` |
+| `q_leave_version` | `contains_expected=yes`, `top1_doc_matches=yes` | `contains_expected=yes`, `top1_doc_matches=yes` ✅ | `before_after_eval.csv` |
+
+Theo kết quả đánh giá (trong file `artifacts/eval/eval_dirty.csv`), việc inject đã làm hỏng Retrieval cho `q_refund_window`: trường `hits_forbidden` bị đổi thành `yes` — text cũ chứa "14 ngày làm việc" đã bị ChromaDB lấy ra. Sau khi chạy lại pipeline chuẩn (run_id=`fix-good`), `hits_forbidden=no` và `q_leave_version` cũng đạt `top1_doc_matches=true`.
+
 Như vậy, hệ thống Cleaning & Expectations hiện hành đóng vai trò tối quan trọng, tránh tình trạng LLM Agent sinh ra câu trả lời sai lệch gây mất uy tín với khách hàng.
 
 ---
