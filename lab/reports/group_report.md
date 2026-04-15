@@ -5,7 +5,7 @@
 | Tên | Vai trò (Day 10) | Email |
 |-----|------------------|-------|
 | Phạm Tuấn Anh | Ingestion / Raw Owner/Monitoring / Docs Owner | Bintuananh2003@gmail.com |
-| ___ | Cleaning & Quality Owner | ___ |
+| Vũ Lê Hoàng | Cleaning & Quality Owner | hoanglevu1705@gmail.com |
 | ___ | Embed & Idempotency Owner | ___ |
 
 **Ngày nộp:** 15/04/2026
