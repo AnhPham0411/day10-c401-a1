@@ -53,6 +53,57 @@ def _normalize_effective_date(raw: str) -> Tuple[str, str]:
     return "", "invalid_effective_date_format"
 
 
+def _map_doc_id_alias(raw: str) -> Tuple[str, str]:
+    """
+    Map common alias or noisy doc_id values to canonical form.
+    Trả về (mapped_doc_id, reason) where reason is empty if no problem.
+    """
+    s = (raw or "").strip().lower()
+    if not s:
+        return "", "empty_doc_id"
+    # common alias map
+    aliases = {
+        "refund_policy_v4": "policy_refund_v4",
+        "policy_refund": "policy_refund_v4",
+        "hr_leave": "hr_leave_policy",
+        "it_helpdesk": "it_helpdesk_faq",
+    }
+    if s in aliases:
+        return aliases[s], "mapped_doc_id_alias"
+    return s, ""
+
+
+def _clean_chunk_text(raw: str) -> str:
+    """Strip HTML tags, collapse whitespace, remove control chars."""
+    s = raw or ""
+    # remove simple HTML tags
+    s = re.sub(r"<[^>]+>", "", s)
+    # remove non-printable/control characters
+    s = "".join(ch for ch in s if ch.isprintable())
+    return " ".join(s.strip().split())
+
+
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2})?$")
+
+
+def _validate_exported_at(raw: str) -> Tuple[str, str]:
+    """Return (normalized_exported_at, error_reason). Empty error_reason if ok.
+
+    Accepts ISO date/time or empty. Reject other noisy formats.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "", ""
+    if _ISO_DATETIME.match(s):
+        return s, ""
+    # try d/m/Y
+    m = _DMY_SLASH.match(s)
+    if m:
+        dd, mm, yyyy = m.group(1), m.group(2), m.group(3)
+        return f"{yyyy}-{mm}-{dd}", ""
+    return "", "invalid_exported_at"
+
+
 def load_raw_csv(path: Path) -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
     with path.open(encoding="utf-8", newline="") as f:
@@ -84,13 +135,32 @@ def clean_rows(
     seq = 0
 
     for raw in rows:
-        doc_id = raw.get("doc_id", "")
+        # map / normalize doc_id (handles common noisy exports)
+        doc_id_raw = raw.get("doc_id", "")
+        doc_id_mapped, docid_reason = _map_doc_id_alias(doc_id_raw)
+        doc_id = doc_id_mapped
         text = raw.get("chunk_text", "")
         eff_raw = raw.get("effective_date", "")
         exported_at = raw.get("exported_at", "")
 
+        # validate exported_at early — quarantine if invalid
+        exported_norm, exported_err = _validate_exported_at(exported_at)
+        if exported_err:
+            quarantine.append({**raw, "reason": exported_err, "exported_at_raw": exported_at})
+            continue
+
+        # normalize/clean text
+        cleaned_text = _clean_chunk_text(text)
+        if cleaned_text and ("error" in cleaned_text.lower() or "traceback" in cleaned_text.lower()):
+            quarantine.append({**raw, "reason": "contains_error_marker"})
+            continue
+
+        # allowlist check after mapping
         if doc_id not in ALLOWED_DOC_IDS:
-            quarantine.append({**raw, "reason": "unknown_doc_id"})
+            reason = "unknown_doc_id"
+            if docid_reason:
+                reason = f"unknown_doc_id_after_map:{docid_reason}"
+            quarantine.append({**raw, "reason": reason})
             continue
 
         eff_norm, eff_err = _normalize_effective_date(eff_raw)
@@ -111,17 +181,17 @@ def clean_rows(
             )
             continue
 
-        if not text:
+        if not cleaned_text:
             quarantine.append({**raw, "reason": "missing_chunk_text"})
             continue
 
-        key = _norm_text(text)
+        key = _norm_text(cleaned_text)
         if key in seen_text:
             quarantine.append({**raw, "reason": "duplicate_chunk_text"})
             continue
         seen_text.add(key)
 
-        fixed_text = text
+        fixed_text = cleaned_text
         if apply_refund_window_fix and doc_id == "policy_refund_v4":
             if "14 ngày làm việc" in fixed_text:
                 fixed_text = fixed_text.replace(
@@ -137,7 +207,7 @@ def clean_rows(
                 "doc_id": doc_id,
                 "chunk_text": fixed_text,
                 "effective_date": eff_norm,
-                "exported_at": exported_at or "",
+                "exported_at": exported_norm or exported_at or "",
             }
         )
 

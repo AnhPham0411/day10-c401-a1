@@ -112,5 +112,29 @@ def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[Expectati
         )
     )
 
+    # E7: không còn thẻ HTML trong chunk_text (nếu còn — cleaning chưa hoạt động)
+    html_left = [r for r in cleaned_rows if "<" in (r.get("chunk_text") or "") or ">" in (r.get("chunk_text") or "")]
+    ok7 = len(html_left) == 0
+    results.append(
+        ExpectationResult(
+            "no_html_tags_remaining",
+            ok7,
+            "halt",
+            f"html_left={len(html_left)}",
+        )
+    )
+
+    # E8: exported_at có định dạng ISO (yyyy-mm-dd hoặc datetime) hoặc rỗng — warn nếu không
+    exported_bad = [r for r in cleaned_rows if (r.get("exported_at") or "") and not re.match(r"^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2})?$", r.get("exported_at") or "")]
+    ok8 = len(exported_bad) == 0
+    results.append(
+        ExpectationResult(
+            "exported_at_iso_or_empty",
+            ok8,
+            "warn",
+            f"exported_bad_count={len(exported_bad)}",
+        )
+    )
+
     halt = any(not r.passed and r.severity == "halt" for r in results)
     return results, halt
