@@ -4,13 +4,12 @@
 **Thành viên:**
 | Tên | Vai trò (Day 10) | Email |
 |-----|------------------|-------|
-| ___ | Ingestion / Raw Owner | ___ |
+| Phạm Tuấn Anh | Ingestion / Raw Owner/Monitoring / Docs Owner | Bintuananh2003@gmail.com |
 | ___ | Cleaning & Quality Owner | ___ |
 | ___ | Embed & Idempotency Owner | ___ |
-| ___ | Monitoring / Docs Owner | ___ |
 
-**Ngày nộp:** ___________  
-**Repo:** ___________  
+**Ngày nộp:** 15/04/2026
+**Repo:** https://github.com/AnhPham0411/day10-c401-a1
 **Độ dài khuyến nghị:** 600–1000 từ
 
 ---
@@ -23,14 +22,21 @@
 
 ## 1. Pipeline tổng quan (150–200 từ)
 
-> Nguồn raw là gì (CSV mẫu / export thật)? Chuỗi lệnh chạy end-to-end? `run_id` lấy ở đâu trong log?
-
 **Tóm tắt luồng:**
+Tóm tắt luồng:
+-Hệ thống thực hiện nạp liệu từ file trích xuất thô policy_export_dirty.csv. Luồng đi qua 4 giai đoạn chính:
 
+-Ingest: Đọc dữ liệu thô, định danh phiên chạy bằng run_id dựa trên timestamp UTC để đảm bảo tính duy nhất.
+
+-Transform & Validate: Làm sạch dữ liệu và kiểm tra qua bộ quy tắc chất lượng (expectations).
+
+-Embed: Thực hiện upsert dữ liệu sạch vào ChromaDB với cơ chế prune để xóa các vector cũ không còn tồn tại, đảm bảo tính Idempotent.
+
+-Monitor: Xuất file Manifest và kiểm tra độ tươi (freshness) so với SLA.
 _________________
 
 **Lệnh chạy một dòng (copy từ README thực tế của nhóm):**
-
+python etl_pipeline.py run
 _________________
 
 ---
@@ -43,7 +49,7 @@ _________________
 
 | Rule / Expectation mới (tên ngắn) | Trước (số liệu) | Sau / khi inject (số liệu) | Chứng cứ (log / CSV / commit) |
 |-----------------------------------|------------------|-----------------------------|-------------------------------|
-| … | … | … | … |
+| Data Ingestion & Freshness | 10 raw records | FAIL (Age: 118h) | manifest_2026-04-15T05-42Z.json |
 
 **Rule chính (baseline + mở rộng):**
 
@@ -71,11 +77,16 @@ _________________
 
 ## 4. Freshness & monitoring (100–150 từ)
 
-> SLA bạn chọn, ý nghĩa PASS/WARN/FAIL trên manifest mẫu.
+Nhóm thống nhất thiết lập SLA = 24 giờ cho độ tươi của dữ liệu chính sách bảo hiểm.
 
-_________________
+PASS: Dữ liệu cập nhật trong < 24h (Dữ liệu tin cậy).
 
----
+WARN: 24h - 48h (Cần kiểm tra hệ thống trích xuất).
+
+FAIL: > 48h (Dữ liệu cũ, có nguy cơ gây sai lệch phản hồi của AI).
+
+Phân tích phiên chạy 2026-04-15T05-42Z:
+Hệ thống báo FAIL với age_hours là 118.058. Điều này cho thấy dữ liệu nguồn (latest_exported_at: 2026-04-10) đã không được cập nhật trong gần 5 ngày. Cơ chế giám sát đã phát hiện chính xác rủi ro dữ liệu lỗi thời (stale data) trước khi đưa vào phục vụ Agent.
 
 ## 5. Liên hệ Day 09 (50–100 từ)
 
@@ -86,5 +97,6 @@ _________________
 ---
 
 ## 6. Rủi ro còn lại & việc chưa làm
+Rủi ro: Pipeline hiện tại chưa tự động chặn (Halt) luồng Embed khi Freshness báo FAIL, dẫn đến việc dữ liệu cũ vẫn bị ghi đè vào Vector DB nếu không có sự can thiệp thủ công.
 
-- …
+Việc chưa làm: Thiết lập hệ thống thông báo tự động (Alerting) qua Telegram/Email cho Monitoring Owner khi trạng thái manifest chuyển sang FAIL.
