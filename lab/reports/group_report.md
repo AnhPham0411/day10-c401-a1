@@ -5,7 +5,7 @@
 | Tên | Vai trò (Day 10) | Email |
 |-----|------------------|-------|
 | Phạm Tuấn Anh | Ingestion / Raw Owner/Monitoring / Docs Owner | Bintuananh2003@gmail.com |
-| ___ | Cleaning & Quality Owner | ___ |
+| Vũ Lê Hoàng | Cleaning & Quality Owner | hoanglevu1705@gmail.com |
 | ___ | Embed & Idempotency Owner | ___ |
 
 **Ngày nộp:** 15/04/2026
@@ -49,11 +49,15 @@ _________________
 
 | Rule / Expectation mới (tên ngắn) | Trước (số liệu) | Sau / khi inject (số liệu) | Chứng cứ (log / CSV / commit) |
 |-----------------------------------|------------------|-----------------------------|-------------------------------|
-| Data Ingestion & Freshness | 10 raw records | FAIL (Age: 118h) | manifest_2026-04-15T05-42Z.json |
+| doc_id_alias_map | unknown_doc_id_quarantine=1 (artifact: quarantine_2026-04-15T05-23Z.csv) | after fix, those rows map → cleaned (quarantine decrease) OR if unknown alias injected → quarantine increases (example inject ↑1) | artifacts/quarantine/quarantine_2026-04-15T05-23Z.csv, commit: transform/cleaning_rules.py |
+| exported_at_validation | invalid_exported_at=0 | after injecting noisy exported_at values, pipeline quarantines them → quarantine_records +N (measured in log `quarantine_records`) | artifacts/logs/run_2026-04-15T05-23Z.log (pipeline logs), transform/cleaning_rules.py |
+| contains_error_marker (remove error/traceback rows) | contains_error_marker=0 | injecting rows with 'ERROR' or 'Traceback' increases quarantine_records by N; prevents bad text entering index → measurable in `artifacts/quarantine/*.csv` | artifacts/quarantine/quarantine_2026-04-15T05-23Z.csv, transform/cleaning_rules.py |
+| no_html_tags_remaining (expectation, HALT) | html_left=0 | if HTML slips through, expectation halts pipeline (stop); inject test with 1 HTML chunk → pipeline halts (observed via manifest / exit code) | quality/expectations.py, run logs |
+| exported_at_iso_or_empty (expectation, WARN) | exported_bad_count=0 | when exported_at malformed, expectation WARN triggered (pipeline continues) — useful early alert | quality/expectations.py, run logs |
 
 **Rule chính (baseline + mở rộng):**
 
-- …
+-
 
 **Ví dụ 1 lần expectation fail (nếu có) và cách xử lý:**
 
