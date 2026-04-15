@@ -99,7 +99,8 @@ Hệ thống báo FAIL với age_hours là 118.058. Điều này cho thấy dữ
 
 > Dữ liệu sau embed có phục vụ lại multi-agent Day 09 không? Nếu có, mô tả tích hợp; nếu không, giải thích vì sao tách collection.
 
-_________________
+Dữ liệu sau khi Embed của Day 10 (lưu vào collection `day10_kb`) chạy hoàn toàn độc lập nhưng được thiết kế để cấp nguồn dữ liệu chuẩn cho Multi-Agent Day 09.
+Thay vì đọc từ file tĩnh, các Agent (như Supervisor, QA Worker) ở Day 09 có thể trực tiếp query vào ChromaDB của Day 10 để tìm kiếm tài liệu. Cách tiếp cận này giúp các Agent luôn lấy được luật bảo hiểm/nhân sự "tươi" nhất và đã được tự động loại bỏ rác (như file nháp, lỗi hệ thống) qua bộ quy tắc Data Quality.
 
 ---
 
