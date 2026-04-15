@@ -1,7 +1,7 @@
 # Quality report — Lab Day 10 (nhóm)
 
-**run_id:** _______________  
-**Ngày:** _______________
+**run_id:** lab/artifacts/logs/run_fix-good.log
+**Ngày:** 15/04/2016
 
 ---
 
@@ -9,32 +9,35 @@
 
 | Chỉ số | Trước | Sau | Ghi chú |
 |--------|-------|-----|---------|
-| raw_records | | | |
-| cleaned_records | | | |
-| quarantine_records | | | |
+| raw_records | 11| 11| |
+| cleaned_records | 6| 6| |
+| quarantine_records |5 |5 | |
 | Expectation halt? | | | |
 
 ---
 
 ## 2. Before / after retrieval (bắt buộc)
 
-> Đính kèm hoặc dẫn link tới `artifacts/eval/before_after_eval.csv` (hoặc 2 file before/after).
+**Trước khi sửa:** lab/artifacts/eval/inject_bad.csv
+**Sau khi sửa:**   lab/artifacts/eval/before_after_eval.csv
 
 **Câu hỏi then chốt:** refund window (`q_refund_window`)  
-**Trước:** (copy dòng CSV hoặc paste top-k)  
-**Sau:**
+**Trước:** q_refund_window,Khách hàng có bao nhiêu ngày để yêu cầu hoàn tiền kể từ khi xác nhận đơn?,policy_refund_v4,Yêu cầu được gửi trong vòng 7 ngày làm việc kể từ thời điểm xác nhận đơn hàng.,yes,yes,,3
+**Sau:** q_refund_window,Khách hàng có bao nhiêu ngày để yêu cầu hoàn tiền kể từ khi xác nhận đơn?,policy_refund_v4,Yêu cầu được gửi trong vòng 7 ngày làm việc kể từ thời điểm xác nhận đơn hàng.,yes,no,,3
 
 **Merit (khuyến nghị):** versioning HR — `q_leave_version` (`contains_expected`, `hits_forbidden`, cột `top1_doc_expected`)
 
-**Trước:**  
-**Sau:**
+**Trước:**  q_leave_version,Theo chính sách nghỉ phép hiện hành (2026), nhân viên dưới 3 năm kinh nghiệm được bao nhiêu ngày phép năm?,hr_leave_policy,Nhân viên dưới 3 năm kinh nghiệm được 12 ngày phép năm theo chính sách 2026.,yes,no,yes,3
+**Sau:** q_leave_version,Theo chính sách nghỉ phép hiện hành (2026), nhân viên dưới 3 năm kinh nghiệm được bao nhiêu ngày phép năm?,hr_leave_policy,Nhân viên dưới 3 năm kinh nghiệm được 12 ngày phép năm theo chính sách 2026.,yes,no,yes,3
 
 ---
 
 ## 3. Freshness & monitor
 
 > Kết quả `freshness_check` (PASS/WARN/FAIL) và giải thích SLA bạn chọn.
-
+python etl_pipeline.py freshness --manifest artifacts/manifests/manifest_fix-good.json
+PASS {"latest_exported_at": "2026-04-10T08:00:00", "age_hours": 121.668, "sla_hours": 130.0}
+Tôi chọn SLA là 130 là đểphuf hợp với dữ liệu demo. SLA mặc định là 24 giờ nhưng tần suất cập nhật nguồn đang là khoảng 120 giờ.
 ---
 
 ## 4. Corruption inject (Sprint 3)
